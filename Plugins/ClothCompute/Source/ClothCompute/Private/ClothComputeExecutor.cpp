@@ -6,6 +6,7 @@
 #include "ShaderParameterStruct.h"
 #include "RenderGraphUtils.h"
 #include "RenderTargetPool.h"
+#include "RHIGPUReadback.h"
 
 // 1. Define the Parameter Struct that matches the USF file
 BEGIN_SHADER_PARAMETER_STRUCT(FTestComputeParameters, )
@@ -78,7 +79,39 @@ void UClothComputeExecutor::ExecuteTestComputeShader()
 					FComputeShaderUtils::Dispatch(RHICmdList, ComputeShader, *PassParameters, GroupCount);
 				});
 
-			// Execute the graph
+			// ================= ADDED READBACK LOGIC =================
+
+			// 1. Create a readback object to store the data coming back from the GPU
+			FRHIGPUBufferReadback* Readback = new FRHIGPUBufferReadback(TEXT("TestComputeReadback"));
+
+			// 2. Add a copy pass to RDG to transfer data from the GPU buffer to the readback object
+			AddEnqueueCopyPass(GraphBuilder, Readback, Buffer, sizeof(float) * InputData.Num());
+
+			// 3. Execute the Render Dependency Graph
 			GraphBuilder.Execute();
+
+			// 4. Force CPU to wait for GPU to finish 
+			// (WARNING: This blocks the render thread. Use for DEBUGGING ONLY!)
+			RHICmdList.BlockUntilGPUIdle();
+
+			// 5. Map the memory and read the results back to CPU
+			if (Readback->IsReady())
+			{
+				const float* ResultData = (const float*)Readback->Lock(sizeof(float) * InputData.Num());
+				if (ResultData)
+				{
+					// Print the first 5 elements to verify (Expected: 1.5 * 2.0 = 3.0)
+					for (int32 i = 0; i < 5; ++i)
+					{
+						UE_LOG(LogTemp, Warning, TEXT("Compute Shader Result [%d]: %f"), i, ResultData[i]);
+					}
+
+					// Always unlock the buffer after you finish reading!
+					Readback->Unlock();
+				}
+			}
+
+			// 6. Clean up the readback object to prevent memory leaks
+			delete Readback;
 		});
 }
