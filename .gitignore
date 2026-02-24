@@ -13,6 +13,7 @@ Build/
 
 # Logs
 *.log
+UpgradeLog.htm
 
 # Optional backup folder
 Backup/
