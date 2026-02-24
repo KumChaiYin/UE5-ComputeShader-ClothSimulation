@@ -9,12 +9,19 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(BlueprintType, Blueprintable)
 class CLOTHCOMPUTE_API UClothComputeExecutor : public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 
 public:
+	// Expose the variables so the UI sliders can modify them
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cloth Simulation|Parameters")
+	float Multiplier = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Cloth Simulation|Parameters")
+	int32 ElementCount = 256; // Using int32 for Blueprint compatibility
+
 	// A static function we can call from anywhere to dispatch our Compute Shader
 	UFUNCTION(BlueprintCallable, Category = "ClothCompute")
 	static void ExecuteTestComputeShader();
