@@ -1,0 +1,22 @@
+# Visual Studio
+.vs/
+*.sln
+*.VC.db
+*.VC.opendb
+
+# UE generated
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# Logs
+*.log
+
+# Optional backup folder
+Backup/
+
+# OS
+.DS_Store
+Thumbs.db
