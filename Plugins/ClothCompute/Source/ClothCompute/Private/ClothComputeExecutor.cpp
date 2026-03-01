@@ -37,6 +37,9 @@ IMPLEMENT_GLOBAL_SHADER(FTestComputeCS, "/ClothComputeShaders/Private/TestComput
 // 4. Implement the Blueprint Function
 void UClothComputeExecutor::ExecuteTestComputeShader()
 {
+	UE_LOG(LogTemp, Warning, TEXT("C++ Function Triggered! Multiplier: %f"), this->Multiplier);
+	UE_LOG(LogTemp, Warning, TEXT("C++ Function Triggered! ElementCount: %d"), this->ElementCount);
+
 	// Read properties on the Game Thread safely
 	float CurrentMultiplier = this->Multiplier;
 	uint32 CurrentElementCount = (uint32)this->ElementCount;
