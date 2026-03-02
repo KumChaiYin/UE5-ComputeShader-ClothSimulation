@@ -1,18 +1,18 @@
 #include "/Engine/Public/Platform.ush"
 
 float Multiplier;
-uint ElementCount;
+int2 TextureSize;
 
-RWStructuredBuffer<float> ClothData;
+// Using RWTexture2D instead of RWStructuredBuffer
+RWTexture2D<float4> OutputTexture;
 
-[numthreads(64, 1, 1)]
+[numthreads(8, 8, 1)]
 void MainCS(uint3 ThreadId : SV_DispatchThreadID)
-{
-    uint Index = ThreadId.x;
-    
-    if (Index >= ElementCount)
-        // Prevent out-of-bounds execution (Crucial now that ElementCount is dynamic)
+{   
+    // Prevent out-of-bounds execution based on texture dimensions
+    if (ThreadId.x >= (uint) TextureSize.x || ThreadId.y >= (uint) TextureSize.y)
         return;
     
-    ClothData[Index] = ClothData[Index] * Multiplier;
+    // Write directly to the pixel (only affect  red color)
+    OutputTexture[ThreadId.xy] = float4(Multiplier, 0.0f, 0.0f, 1.0f);
 }

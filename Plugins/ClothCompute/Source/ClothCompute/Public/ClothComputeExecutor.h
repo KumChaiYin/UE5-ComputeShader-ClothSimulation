@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
+#include "Engine/TextureRenderTarget2D.h"
 #include "ClothComputeExecutor.generated.h"
 
 /**
@@ -20,7 +21,10 @@ public:
 	float Multiplier = 1.0f;  // set to 1 to avoid numerical overflow (using Tick)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
-	int32 ElementCount = 256; // Using int32 for Blueprint compatibility
+	UTextureRenderTarget2D* OutputRenderTarget;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
+	int32 ElementCount = 256;
 
 	// A static function we can call from anywhere to dispatch our Compute Shader
 	UFUNCTION(BlueprintCallable, Category = "ClothCompute")
