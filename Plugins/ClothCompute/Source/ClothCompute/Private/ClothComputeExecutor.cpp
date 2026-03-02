@@ -7,6 +7,9 @@
 #include "RenderGraphUtils.h"
 #include "RenderTargetPool.h"
 
+// Declare a custom GPU Stat for the viewport
+DECLARE_GPU_STAT_NAMED(Stat_ClothComputeDispatch, TEXT("Cloth Compute Dispatch"));
+
 // 1. Define the Parameter Struct that matches the USF file
 BEGIN_SHADER_PARAMETER_STRUCT(FTestComputeParameters, )
 	SHADER_PARAMETER(float, Multiplier)               // 4 bytes
@@ -84,11 +87,14 @@ void UClothComputeExecutor::ExecuteTestComputeShader()
 			FIntVector GroupCount = FIntVector(FMath::DivideAndRoundUp(CurrentElementCount, 64u), 1, 1);
 
 			GraphBuilder.AddPass(
-				RDG_EVENT_NAME("ExecuteTestCompute"),
+				RDG_EVENT_NAME("ExecuteTestCompute Elements:%d", CurrentElementCount),
 				PassParameters,
 				ERDGPassFlags::Compute,
 				[ComputeShader, PassParameters, GroupCount](FRHIComputeCommandList& RHICmdList)
 				{
+					// Scope the exact dispatch time for 'stat gpu'
+					SCOPED_GPU_STAT(RHICmdList, Stat_ClothComputeDispatch);
+
 					FComputeShaderUtils::Dispatch(RHICmdList, ComputeShader, *PassParameters, GroupCount);
 				});
 

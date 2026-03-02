@@ -17,7 +17,7 @@ class CLOTHCOMPUTE_API UClothComputeExecutor : public UObject
 public:
 	// Expose the variables so the UI sliders can modify them
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
-	float Multiplier = 2.0f;
+	float Multiplier = 1.0f;  // set to 1 to avoid numerical overflow (using Tick)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
 	int32 ElementCount = 256; // Using int32 for Blueprint compatibility
