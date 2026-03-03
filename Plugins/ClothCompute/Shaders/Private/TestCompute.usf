@@ -16,14 +16,18 @@ void MainCS(uint3 ThreadId : SV_DispatchThreadID)
     if (ThreadId.x >= (uint) ElementCount)
         return;
     
-    // X: Space them out by 50 units
-    // Y: Keep at 0
-    // Z: "Fly up" based on the UI multiplier
-    float3 NewPosition = float3(ThreadId.x * 50.0f, 0.0f, Multiplier * 100.0f);
+    float3 CurrentPosition = OutputBuffer[ThreadId.x];
+    
+    CurrentPosition.z += Multiplier * 10.0f;
+    
+    if (CurrentPosition.x == 0.0f)
+    {
+        CurrentPosition.x = ThreadId.x * 50.0f;
+    }
 
     // 1. Write to Buffer
-    OutputBuffer[ThreadId.x] = NewPosition;
+    OutputBuffer[ThreadId.x] = CurrentPosition;
     
     // 2. Write to Texture (Y is 0 because our Render Target is a 1D line of pixels)
-    OutputTexture[uint2(ThreadId.x, 0)] = float4(NewPosition, 1.0f);
+    OutputTexture[uint2(ThreadId.x, 0)] = float4(CurrentPosition, 1.0f);
 }

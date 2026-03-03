@@ -9,9 +9,8 @@
 #include "Engine/TextureRenderTarget2D.h"
 #include "ClothComputeExecutor.generated.h"
 
-/**
- * 
- */
+class FRHIGPUBufferReadback;
+
 UCLASS(BlueprintType, Blueprintable)
 class CLOTHCOMPUTE_API UClothComputeExecutor : public UObject
 {
@@ -33,6 +32,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ClothCompute")
 	void ExecuteTestComputeShader();
 
+	UFUNCTION(BlueprintCallable, Category = "ClothCompute")
+	void PrintBufferDataToLog();
+
 	// RDG-native pooled buffer that survives between frames
-	TRefCountPtr<FRDGPooledBuffer> PositionBuffer;
+	TRefCountPtr<FRDGPooledBuffer> PositionBuffer = nullptr;
+	// ADD THIS: Track the size from the previous frame
+	int32 PreviousElementCount = 0;
+
+	FRHIGPUBufferReadback* GPUReadback = nullptr;
 };
