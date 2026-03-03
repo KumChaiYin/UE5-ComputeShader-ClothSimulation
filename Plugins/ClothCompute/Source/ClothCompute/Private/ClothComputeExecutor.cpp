@@ -5,8 +5,6 @@
 #include "GlobalShader.h"
 #include "ShaderParameterStruct.h"
 #include "RenderGraphUtils.h"
-#include "RenderTargetPool.h"
-#include "Engine/TextureRenderTarget2D.h"
 #include "RHI.h"
 #include "RHIResources.h"
 
@@ -16,8 +14,8 @@ DECLARE_GPU_STAT_NAMED(Stat_ClothComputeDispatch, TEXT("Cloth Compute Dispatch")
 // 1. Define the Parameter Struct that matches the USF file
 BEGIN_SHADER_PARAMETER_STRUCT(FTestComputeParameters, )
 	SHADER_PARAMETER(float, Multiplier)
-	SHADER_PARAMETER(FIntPoint, TextureSize) // Pass resolution to shader for bounds checking
-	SHADER_PARAMETER_RDG_TEXTURE_UAV(FRDGTextureUAVRef, OutputTexture) // Changed from Buffer to Texture
+	SHADER_PARAMETER(int32, ElementCount)
+	SHADER_PARAMETER_RDG_BUFFER_UAV(FRDGBufferUAVRef, OutputBuffer) // Changed to Buffer
 END_SHADER_PARAMETER_STRUCT()
 
 // 2. Link the C++ class to the .usf file
@@ -43,55 +41,46 @@ IMPLEMENT_GLOBAL_SHADER(FTestComputeCS, "/ClothComputeShaders/Private/TestComput
 void UClothComputeExecutor::ExecuteTestComputeShader()
 {
 	UE_LOG(LogTemp, Warning, TEXT("C++ Function Triggered! Multiplier: %f"), this->Multiplier);
-	
-	if (!OutputRenderTarget)
-	{
-		UE_LOG(LogTemp, Error, TEXT("OutputRenderTarget is null! Please assign it in Blueprint."));
-		return;
-	}
+	UE_LOG(LogTemp, Warning, TEXT("C++ Function Triggered! ElementCount: %d"), this->ElementCount);
 
 	// Read properties on the Game Thread safely
 	float CurrentMultiplier = this->Multiplier;
-
-	// Safely grab the render target resource for the Render Thread
-	FTextureRenderTargetResource* RTResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
+	int32 CurrentElementCount = this->ElementCount;
 
 	// Enqueue the render command to run on the Render Thread
 	ENQUEUE_RENDER_COMMAND(FExecuteTestCompute)(
-		[CurrentMultiplier, RTResource](FRHICommandListImmediate& RHICmdList)
+		[this, CurrentMultiplier, CurrentElementCount](FRHICommandListImmediate& RHICmdList)
 		{
 			// Initialize the RDG Builder
 			FRDGBuilder GraphBuilder(RHICmdList);
 
-			// --- A. Extract RHI and Bind to RDG ---
-			FTextureRHIRef TextureRHI = RTResource->GetRenderTargetTexture();
-			if (!TextureRHI) return;
-
-			// Register the external render target texture into the graph
-			FRDGTextureRef RDGTexture = RegisterExternalTexture(GraphBuilder, TextureRHI, TEXT("ComputeOutputTexture"));
+			// --- A. Create a New Buffer Every Frame ---
+			// We completely drop the if() check and RegisterExternalBuffer.
+			// RDG is smart enough to pull from an internal memory pool automatically.
+			FRDGBufferDesc Desc = FRDGBufferDesc::CreateStructuredDesc(sizeof(FVector3f), CurrentElementCount);
+			FRDGBufferRef RDGBuffer = GraphBuilder.CreateBuffer(Desc, TEXT("ComputeOutputBuffer"));
 
 			// Create the UAV so the shader can write to it
-			FRDGTextureUAVRef TextureUAV = GraphBuilder.CreateUAV(RDGTexture);
+			FRDGBufferUAVRef BufferUAV = GraphBuilder.CreateUAV(RDGBuffer);
 
 			// --- B. Setup the Shader ---
 			TShaderMapRef<FTestComputeCS> ComputeShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
-
 			FTestComputeParameters* PassParameters = GraphBuilder.AllocParameters<FTestComputeParameters>();
 			
 			PassParameters->Multiplier = CurrentMultiplier;
-			PassParameters->TextureSize = FIntPoint(TextureRHI->GetSizeX(), TextureRHI->GetSizeY());
-			PassParameters->OutputTexture = TextureUAV;
+			PassParameters->ElementCount = CurrentElementCount;
+			PassParameters->OutputBuffer = BufferUAV;
 
 			// --- C. Dispatch the Shader ---
 			// Divided by 64 threads per group = 1 group
 			FIntVector GroupCount = FIntVector(
-				FMath::DivideAndRoundUp((int32)TextureRHI->GetSizeX(), 8),
-				FMath::DivideAndRoundUp((int32)TextureRHI->GetSizeY(), 8),
+				FMath::DivideAndRoundUp(CurrentElementCount, 64),
+				1,
 				1
 			);
 
 			GraphBuilder.AddPass(
-				RDG_EVENT_NAME("ExecuteTestCompute 2D Texture"),
+				RDG_EVENT_NAME("ExecuteTestCompute 1D Buffer"),
 				PassParameters,
 				ERDGPassFlags::Compute,
 				[ComputeShader, PassParameters, GroupCount](FRHIComputeCommandList& RHICmdList)
@@ -101,6 +90,11 @@ void UClothComputeExecutor::ExecuteTestComputeShader()
 
 					FComputeShaderUtils::Dispatch(RHICmdList, ComputeShader, *PassParameters, GroupCount);
 				});
+
+			// --- D. Extract Buffer ---
+			// IMPORTANT: This tells RDG to save the buffer's data into our persistent 'PositionBuffer'
+			// variable before destroying the graph. It also automatically transitions the buffer to an SRV state!
+			GraphBuilder.QueueBufferExtraction(RDGBuffer, &PositionBuffer);
 
 			// Execute the graph
 			GraphBuilder.Execute();

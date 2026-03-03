@@ -4,7 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
-#include "Engine/TextureRenderTarget2D.h"
+#include "RenderGraphDefinitions.h" // Added for FRDGPooledBuffer
+#include "RenderGraphResources.h" // Add this to define FRDGPooledBuffer
 #include "ClothComputeExecutor.generated.h"
 
 /**
@@ -18,16 +19,15 @@ class CLOTHCOMPUTE_API UClothComputeExecutor : public UObject
 public:
 	// Expose the variables so the UI sliders can modify them
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
-	float Multiplier = 1.0f;  // set to 1 to avoid numerical overflow (using Tick)
+	float Multiplier = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
-	UTextureRenderTarget2D* OutputRenderTarget;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
-	int32 ElementCount = 256;
+	int32 ElementCount = 3;
 
 	// A static function we can call from anywhere to dispatch our Compute Shader
 	UFUNCTION(BlueprintCallable, Category = "ClothCompute")
 	void ExecuteTestComputeShader();
 
+	// RDG-native pooled buffer that survives between frames
+	TRefCountPtr<FRDGPooledBuffer> PositionBuffer;
 };
