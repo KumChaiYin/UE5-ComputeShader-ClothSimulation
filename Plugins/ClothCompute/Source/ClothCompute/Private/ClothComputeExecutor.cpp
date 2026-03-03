@@ -7,6 +7,8 @@
 #include "RenderGraphUtils.h"
 #include "RHI.h"
 #include "RHIResources.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "TextureResource.h"
 
 // Declare a custom GPU Stat for the viewport
 DECLARE_GPU_STAT_NAMED(Stat_ClothComputeDispatch, TEXT("Cloth Compute Dispatch"));
@@ -15,7 +17,8 @@ DECLARE_GPU_STAT_NAMED(Stat_ClothComputeDispatch, TEXT("Cloth Compute Dispatch")
 BEGIN_SHADER_PARAMETER_STRUCT(FTestComputeParameters, )
 	SHADER_PARAMETER(float, Multiplier)
 	SHADER_PARAMETER(int32, ElementCount)
-	SHADER_PARAMETER_RDG_BUFFER_UAV(FRDGBufferUAVRef, OutputBuffer) // Changed to Buffer
+	SHADER_PARAMETER_RDG_BUFFER_UAV(FRDGBufferUAVRef, OutputBuffer)
+	SHADER_PARAMETER_RDG_TEXTURE_UAV(FRDGTextureUAVRef, OutputTexture)
 END_SHADER_PARAMETER_STRUCT()
 
 // 2. Link the C++ class to the .usf file
@@ -47,9 +50,18 @@ void UClothComputeExecutor::ExecuteTestComputeShader()
 	float CurrentMultiplier = this->Multiplier;
 	int32 CurrentElementCount = this->ElementCount;
 
+	// Safety check to prevent crashes if the Blueprint is missing the RT
+	if (!OutputRenderTarget)
+	{
+		UE_LOG(LogTemp, Error, TEXT("OutputRenderTarget is null! Please assign it in Blueprint."));
+		return;
+	}
+
+	FTextureRenderTargetResource* RTResource = OutputRenderTarget->GameThread_GetRenderTargetResource();
+
 	// Enqueue the render command to run on the Render Thread
 	ENQUEUE_RENDER_COMMAND(FExecuteTestCompute)(
-		[this, CurrentMultiplier, CurrentElementCount](FRHICommandListImmediate& RHICmdList)
+		[this, CurrentMultiplier, CurrentElementCount, RTResource](FRHICommandListImmediate& RHICmdList)
 		{
 			// Initialize the RDG Builder
 			FRDGBuilder GraphBuilder(RHICmdList);
@@ -63,6 +75,13 @@ void UClothComputeExecutor::ExecuteTestComputeShader()
 			// Create the UAV so the shader can write to it
 			FRDGBufferUAVRef BufferUAV = GraphBuilder.CreateUAV(RDGBuffer);
 
+			// Setup the Texture Bridge
+			FTextureRHIRef TextureRHI = RTResource->GetRenderTargetTexture();
+			if (!TextureRHI) return;
+
+			FRDGTextureRef RDGTexture = RegisterExternalTexture(GraphBuilder, TextureRHI, TEXT("ComputeOutputTexture"));
+			FRDGTextureUAVRef TextureUAV = GraphBuilder.CreateUAV(RDGTexture);
+
 			// --- B. Setup the Shader ---
 			TShaderMapRef<FTestComputeCS> ComputeShader(GetGlobalShaderMap(GMaxRHIFeatureLevel));
 			FTestComputeParameters* PassParameters = GraphBuilder.AllocParameters<FTestComputeParameters>();
@@ -70,6 +89,7 @@ void UClothComputeExecutor::ExecuteTestComputeShader()
 			PassParameters->Multiplier = CurrentMultiplier;
 			PassParameters->ElementCount = CurrentElementCount;
 			PassParameters->OutputBuffer = BufferUAV;
+			PassParameters->OutputTexture = TextureUAV;
 
 			// --- C. Dispatch the Shader ---
 			// Divided by 64 threads per group = 1 group

@@ -6,6 +6,9 @@ int ElementCount;
 // Using a Structured Buffer of float3 (X, Y, Z)
 RWStructuredBuffer<float3> OutputBuffer;
 
+// The visual Texture Bridge
+RWTexture2D<float4> OutputTexture;
+
 [numthreads(64, 1, 1)]
 void MainCS(uint3 ThreadId : SV_DispatchThreadID)
 {   
@@ -18,5 +21,9 @@ void MainCS(uint3 ThreadId : SV_DispatchThreadID)
     // Z: "Fly up" based on the UI multiplier
     float3 NewPosition = float3(ThreadId.x * 50.0f, 0.0f, Multiplier * 100.0f);
 
+    // 1. Write to Buffer
     OutputBuffer[ThreadId.x] = NewPosition;
+    
+    // 2. Write to Texture (Y is 0 because our Render Target is a 1D line of pixels)
+    OutputTexture[uint2(ThreadId.x, 0)] = float4(NewPosition, 1.0f);
 }

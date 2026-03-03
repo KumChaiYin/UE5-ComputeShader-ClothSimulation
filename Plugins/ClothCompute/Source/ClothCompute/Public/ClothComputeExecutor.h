@@ -6,6 +6,7 @@
 #include "UObject/NoExportTypes.h"
 #include "RenderGraphDefinitions.h" // Added for FRDGPooledBuffer
 #include "RenderGraphResources.h" // Add this to define FRDGPooledBuffer
+#include "Engine/TextureRenderTarget2D.h"
 #include "ClothComputeExecutor.generated.h"
 
 /**
@@ -23,6 +24,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
 	int32 ElementCount = 3;
+
+	// Re-exposed for the Texture Bridge
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ClothCompute")
+	UTextureRenderTarget2D* OutputRenderTarget;
 
 	// A static function we can call from anywhere to dispatch our Compute Shader
 	UFUNCTION(BlueprintCallable, Category = "ClothCompute")
